@@ -1,0 +1,13 @@
+{
+  "name": "tracker-project-service",
+  "version": "1.0.0",
+  "description": "Project CRUD microservice",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "dependencies": {
+    "@tracker/common": "file:../tracker-common-lib",
+    "express": "^4.18.2",
+    "sql.js": "^1.10.0",
+    "uuid": "^9.0.0"
+  }
+}
