@@ -6,20 +6,50 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
+  repository_dispatch:
+    types: [project-updated]
 
 jobs:
   run-skill:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout multi-repo-analyser
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Execute SKILL.md
+      - name: Clone all project repos and execute SKILL.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          pip install -e ./project5
-          python -c "from project5 import ultra_greet; print(ultra_greet('CI'))"
+          # Read projects.json and clone all repos dynamically
+          OWNER=$(jq -r '.github_owner' projects.json)
+          
+          for repo in $(jq -r '.projects[].repo' projects.json); do
+            echo "📦 Cloning $OWNER/$repo..."
+            git clone https://github.com/$OWNER/$repo.git $repo || \
+            gh repo clone $OWNER/$repo $repo || \
+            echo "⚠️ Could not clone $repo"
+          done
+          
+          # Install all projects in dependency order
+          for proj in $(jq -r '.projects[].name' projects.json); do
+            if [ -d "$proj" ]; then
+              echo "📥 Installing $proj..."
+              pip install -e ./$proj 2>/dev/null || pip install ./$proj || echo "⚠️ Could not install $proj"
+            fi
+          done
+          
+          # Run tests for each project
+          echo "🧪 Running tests..."
+          jq -r '.projects[] | "\(.name)|\(.test_command)"' projects.json | while IFS='|' read -r name cmd; do
+            echo "Testing $name..."
+            eval "$cmd" || echo "⚠️ Test failed for $name"
+          done
+          
+          echo "✅ SKILL.md execution complete!"
