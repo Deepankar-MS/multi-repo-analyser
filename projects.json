@@ -1,0 +1,45 @@
+{
+  "github_owner": "Deepankar-MS",
+  "projects": [
+    {
+      "name": "project1",
+      "repo": "project1",
+      "path": "./project1",
+      "dependencies": [],
+      "test_command": "python -c \"from project1 import greet; print(greet('CI'))\"",
+      "export_function": "greet"
+    },
+    {
+      "name": "project2",
+      "repo": "project2",
+      "path": "./project2",
+      "dependencies": ["project1"],
+      "test_command": "python -c \"from project2 import enhanced_greet; print(enhanced_greet('CI'))\"",
+      "export_function": "enhanced_greet"
+    },
+    {
+      "name": "project3",
+      "repo": "project3",
+      "path": "./project3",
+      "dependencies": ["project1", "project2"],
+      "test_command": "python -c \"from project3 import super_greet; print(super_greet('CI'))\"",
+      "export_function": "super_greet"
+    },
+    {
+      "name": "project4",
+      "repo": "project4",
+      "path": "./project4",
+      "dependencies": ["project1", "project2", "project3"],
+      "test_command": "python -c \"from project4 import mega_greet; print(mega_greet('CI'))\"",
+      "export_function": "mega_greet"
+    },
+    {
+      "name": "project5",
+      "repo": "project5",
+      "path": "./project5",
+      "dependencies": ["project1", "project2", "project3", "project4"],
+      "test_command": "python -c \"from project5 import ultra_greet; print(ultra_greet('CI'))\"",
+      "export_function": "ultra_greet"
+    }
+  ]
+}
