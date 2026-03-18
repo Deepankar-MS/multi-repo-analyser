@@ -12,15 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: github/copilot-swe-agent@v1
         with:
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Execute SKILL.md
-        run: |
-          pip install -r requirements.txt
-          grep -Pzo '```bash\n\K[^`]*' SKILL.md 2>/dev/null | tr '\0' '\n' | bash || \
-          python -c "from project5 import ultra_greet; print(ultra_greet('CI'))"
+          skill: SKILL.md
