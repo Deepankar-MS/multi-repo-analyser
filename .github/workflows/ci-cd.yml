@@ -54,10 +54,12 @@ jobs:
           
           # Phase 6: Generate Change Summary and Dependency Reports
           echo ""
-          echo "📊 Generating Impact Reports..."
+          echo "═══════════════════════════════════════════════════════════════"
+          echo "📊 MULTI-REPOSITORY IMPACT REPORT"
+          echo "═══════════════════════════════════════════════════════════════"
           echo ""
           
-          # === SECTION: Change Summary by Repository ===
+          # === SECTION 1: Detailed Change Summary by Repository ===
           echo "## 📝 Change Summary by Repository"
           echo ""
           echo "| Repository | Files Changed | Change Type | Last Commit |"
@@ -87,7 +89,52 @@ jobs:
           
           echo ""
           
-          # === SECTION: Cross-Repository Dependencies ===
+          # === SECTION 2: Detailed Changes Per Repository ===
+          echo "## 📂 Detailed Changes Per Repository"
+          echo ""
+          
+          for proj in $(jq -r '.projects[].name' projects.json); do
+            if [ -d "$proj" ]; then
+              cd "$proj"
+              
+              echo "### 📦 $proj"
+              echo ""
+              
+              # Show files changed
+              echo "**Files Modified:**"
+              git diff --name-only HEAD~1 2>/dev/null | while read file; do
+                echo "- \`$file\`"
+              done
+              echo ""
+              
+              # Show new/modified functions (for Python files)
+              echo "**Code Changes:**"
+              for pyfile in $(git diff --name-only HEAD~1 2>/dev/null | grep "\.py$"); do
+                if [ -f "$pyfile" ]; then
+                  echo "  📄 \`$pyfile\`:"
+                  # Extract function definitions added
+                  git diff HEAD~1 -- "$pyfile" 2>/dev/null | grep "^+" | grep -E "^\+def |^\+class |^\+async def " | sed 's/^+/    ➕ Added: /' || true
+                  # Extract function definitions removed
+                  git diff HEAD~1 -- "$pyfile" 2>/dev/null | grep "^-" | grep -E "^\-def |^\-class |^\-async def " | sed 's/^-/    ➖ Removed: /' || true
+                fi
+              done
+              echo ""
+              
+              # Show version changes
+              if [ -f "pyproject.toml" ]; then
+                VERSION=$(grep -E "^version\s*=" pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "N/A")
+                echo "**Version:** $VERSION"
+              fi
+              echo ""
+              echo "---"
+              
+              cd ..
+            fi
+          done
+          
+          echo ""
+          
+          # === SECTION 3: Cross-Repository Dependencies ===
           echo "## 🔗 Cross-Repository Dependencies"
           echo ""
           echo "| Repository | Depends On | Depended By | Breaking Changes |"
@@ -104,6 +151,69 @@ jobs:
           done
           
           echo ""
+          
+          # === SECTION 4: Required Updates in Dependent Projects ===
+          echo "## 🔄 Required Updates in Dependent Projects"
+          echo ""
+          
+          for proj in $(jq -r '.projects[].name' projects.json); do
+            if [ -d "$proj" ]; then
+              cd "$proj"
+              
+              # Check if there are actual changes
+              CHANGES=$(git diff --name-only HEAD~1 2>/dev/null | wc -l)
+              
+              if [ "$CHANGES" -gt 0 ]; then
+                # Get dependent projects
+                DEPENDED_BY=$(jq -r --arg p "$proj" '.projects[] | select(.dependencies | index($p)) | .name' ../projects.json 2>/dev/null)
+                
+                if [ -n "$DEPENDED_BY" ]; then
+                  echo "### 📦 Changes in \`$proj\` affect:"
+                  echo ""
+                  
+                  # Extract new functions/exports
+                  NEW_EXPORTS=""
+                  for pyfile in $(git diff --name-only HEAD~1 2>/dev/null | grep "\.py$"); do
+                    if [ -f "$pyfile" ]; then
+                      FUNCS=$(git diff HEAD~1 -- "$pyfile" 2>/dev/null | grep "^+" | grep -E "^\+def " | sed 's/+def \([a-zA-Z_]*\).*/\1/' | tr '\n' ', ' | sed 's/,$//')
+                      if [ -n "$FUNCS" ]; then
+                        NEW_EXPORTS="$NEW_EXPORTS$FUNCS, "
+                      fi
+                    fi
+                  done
+                  NEW_EXPORTS=$(echo "$NEW_EXPORTS" | sed 's/, $//')
+                  
+                  for dep in $DEPENDED_BY; do
+                    echo "#### 🎯 \`$dep\`"
+                    echo ""
+                    echo "**Impact:** This project imports from \`$proj\`"
+                    echo ""
+                    
+                    if [ -n "$NEW_EXPORTS" ]; then
+                      echo "**New functions available to use:**"
+                      echo "\`\`\`python"
+                      echo "from $proj import $NEW_EXPORTS"
+                      echo "\`\`\`"
+                      echo ""
+                      echo "**Recommended Actions:**"
+                      echo "- ✅ Consider using new functions: \`$NEW_EXPORTS\`"
+                      echo "- ✅ Update version requirement if needed"
+                      echo "- ⚠️ Run tests to ensure compatibility"
+                    else
+                      echo "**Recommended Actions:**"
+                      echo "- ✅ No code changes required (backward compatible)"
+                      echo "- ⚠️ Run tests to verify compatibility"
+                    fi
+                    echo ""
+                  done
+                fi
+              fi
+              
+              cd ..
+            fi
+          done
+          
+          echo ""
           echo "### Dependency Notes"
           for proj in $(jq -r '.projects[].name' projects.json); do
             DEPENDED_BY=$(jq -r --arg p "$proj" '.projects[] | select(.dependencies | index($p)) | .name' projects.json | tr '\n' ', ' | sed 's/,$//')
@@ -113,4 +223,6 @@ jobs:
           done
           
           echo ""
+          echo "═══════════════════════════════════════════════════════════════"
           echo "✅ SKILL.md execution complete!"
+          echo "═══════════════════════════════════════════════════════════════"
