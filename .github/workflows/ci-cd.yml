@@ -282,3 +282,19 @@ jobs:
           echo "═══════════════════════════════════════════════════════════════"
           echo "✅ SKILL.md execution complete!"
           echo "═══════════════════════════════════════════════════════════════"
+
+      - name: Upload Impact Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: impact-report
+          path: changes_output.txt
+          retention-days: 30
+
+      - name: Add Report to Job Summary
+        run: |
+          echo "## 📊 Multi-Repository Impact Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat changes_output.txt >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "📥 **Download full report:** Check the **Artifacts** section below" >> $GITHUB_STEP_SUMMARY
