@@ -117,6 +117,21 @@ For each discovered repo:
     #### f. Total Effort Summary
     Aggregate effort across all repos.
 
+    #### g. Change Summary by Repository
+    For each repository where changes have been made, document:
+    - **Repository name and path**
+    - **Files modified** — list of files changed with brief description of each change
+    - **Type of changes** — new features, bug fixes, refactoring, configuration updates
+    - **Commit summary** — what was done and why
+
+    #### h. Cross-Repository Dependencies
+    Identify and document dependencies between repositories:
+    - **Upstream dependencies** — which repos this repo depends on
+    - **Downstream dependencies** — which repos depend on this repo
+    - **Impact propagation** — if changes in one repo require updates in dependent repos
+    - **Dependency version requirements** — specific versions needed for compatibility
+    - **Breaking changes** — flag any changes that may break dependent repositories
+
 ## Handling Additional User Queries
 
 After the initial analysis, the user may ask follow-up questions such as:
@@ -165,6 +180,30 @@ Use this structure for the final output:
 1. First repo to change (and why)
 2. Second repo
 3. ...
+
+### Change Summary by Repository
+
+| Repository | Files Changed | Change Type | Description |
+|-----------|---------------|-------------|-------------|
+| repo-name | file1.ts, file2.ts | Feature/Bugfix/Refactor | Brief description of changes |
+
+#### [repo-name]
+**Files Modified:**
+- `path/to/file.ts` — Description of change
+- `path/to/another-file.ts` — Description of change
+
+**Change Summary:** Detailed summary of what was done and why
+
+### Cross-Repository Dependencies
+
+| Repository | Depends On | Depended By | Breaking Changes |
+|-----------|------------|-------------|------------------|
+| repo-name | repo-a, repo-b | repo-c | Yes/No |
+
+**Dependency Notes:**
+- [repo-name] requires [dependency-repo] version X.X.X or higher
+- Changes in [repo-a] will require updates in [repo-b] and [repo-c]
+- [Breaking change description if any]
 
 ### Total Effort Estimate
 - Development: X days
