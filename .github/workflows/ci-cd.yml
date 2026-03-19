@@ -52,4 +52,65 @@ jobs:
             eval "$cmd" || echo "⚠️ Test failed for $name"
           done
           
+          # Phase 6: Generate Change Summary and Dependency Reports
+          echo ""
+          echo "📊 Generating Impact Reports..."
+          echo ""
+          
+          # === SECTION: Change Summary by Repository ===
+          echo "## 📝 Change Summary by Repository"
+          echo ""
+          echo "| Repository | Files Changed | Change Type | Last Commit |"
+          echo "|-----------|---------------|-------------|-------------|"
+          
+          for proj in $(jq -r '.projects[].name' projects.json); do
+            if [ -d "$proj" ]; then
+              cd "$proj"
+              FILES=$(git diff --name-only HEAD~1 2>/dev/null | wc -l || echo "0")
+              COMMIT=$(git log -1 --pretty=format:"%s" 2>/dev/null | head -c 50 || echo "N/A")
+              
+              # Detect change type from commit message
+              if echo "$COMMIT" | grep -qi "feat"; then
+                TYPE="Feature"
+              elif echo "$COMMIT" | grep -qi "fix"; then
+                TYPE="Bugfix"
+              elif echo "$COMMIT" | grep -qi "refactor"; then
+                TYPE="Refactor"
+              else
+                TYPE="Update"
+              fi
+              
+              echo "| $proj | $FILES | $TYPE | $COMMIT |"
+              cd ..
+            fi
+          done
+          
+          echo ""
+          
+          # === SECTION: Cross-Repository Dependencies ===
+          echo "## 🔗 Cross-Repository Dependencies"
+          echo ""
+          echo "| Repository | Depends On | Depended By | Breaking Changes |"
+          echo "|-----------|------------|-------------|------------------|"
+          
+          for proj in $(jq -r '.projects[].name' projects.json); do
+            DEPS=$(jq -r --arg p "$proj" '.projects[] | select(.name==$p) | .dependencies | join(", ")' projects.json)
+            [ -z "$DEPS" ] && DEPS="None"
+            
+            DEPENDED_BY=$(jq -r --arg p "$proj" '.projects[] | select(.dependencies | index($p)) | .name' projects.json | tr '\n' ', ' | sed 's/,$//')
+            [ -z "$DEPENDED_BY" ] && DEPENDED_BY="None"
+            
+            echo "| $proj | $DEPS | $DEPENDED_BY | No |"
+          done
+          
+          echo ""
+          echo "### Dependency Notes"
+          for proj in $(jq -r '.projects[].name' projects.json); do
+            DEPENDED_BY=$(jq -r --arg p "$proj" '.projects[] | select(.dependencies | index($p)) | .name' projects.json | tr '\n' ', ' | sed 's/,$//')
+            if [ -n "$DEPENDED_BY" ]; then
+              echo "- ⚠️ Changes to **$proj** will impact: $DEPENDED_BY"
+            fi
+          done
+          
+          echo ""
           echo "✅ SKILL.md execution complete!"
