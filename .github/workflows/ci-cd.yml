@@ -59,11 +59,24 @@ jobs:
           echo "═══════════════════════════════════════════════════════════════"
           echo ""
           
+          # Create/overwrite changes_output.txt with latest changes only
+          REPORT_FILE="changes_output.txt"
+          
+          # Start fresh report file
+          cat > "$REPORT_FILE" << 'HEADER'
+          ═══════════════════════════════════════════════════════════════
+          📊 MULTI-REPOSITORY IMPACT REPORT
+          ═══════════════════════════════════════════════════════════════
+          HEADER
+          
+          echo "Generated: $(date)" >> "$REPORT_FILE"
+          echo "" >> "$REPORT_FILE"
+          
           # === SECTION 1: Detailed Change Summary by Repository ===
-          echo "## 📝 Change Summary by Repository"
-          echo ""
-          echo "| Repository | Files Changed | Change Type | Last Commit |"
-          echo "|-----------|---------------|-------------|-------------|"
+          echo "## 📝 Change Summary by Repository" >> "$REPORT_FILE"
+          echo "" >> "$REPORT_FILE"
+          echo "| Repository | Files Changed | Change Type | Last Commit |" >> "$REPORT_FILE"
+          echo "|-----------|---------------|-------------|-------------|" >> "$REPORT_FILE"
           
           for proj in $(jq -r '.projects[].name' projects.json); do
             if [ -d "$proj" ]; then
@@ -82,63 +95,88 @@ jobs:
                 TYPE="Update"
               fi
               
-              echo "| $proj | $FILES | $TYPE | $COMMIT |"
+              echo "| $proj | $FILES | $TYPE | $COMMIT |" >> "../$REPORT_FILE"
               cd ..
             fi
           done
           
-          echo ""
+          echo "" >> "$REPORT_FILE"
           
-          # === SECTION 2: Detailed Changes Per Repository ===
-          echo "## 📂 Detailed Changes Per Repository"
-          echo ""
+          # === SECTION 2: Detailed Changes Per Repository (LATEST ONLY) ===
+          echo "## 📂 Detailed Changes Per Repository (Latest Commit Only)" >> "$REPORT_FILE"
+          echo "" >> "$REPORT_FILE"
           
           for proj in $(jq -r '.projects[].name' projects.json); do
             if [ -d "$proj" ]; then
               cd "$proj"
               
-              echo "### 📦 $proj"
-              echo ""
+              # Check if there are changes in the latest commit
+              CHANGED_FILES=$(git diff --name-only HEAD~1 2>/dev/null)
               
-              # Show files changed
-              echo "**Files Modified:**"
-              git diff --name-only HEAD~1 2>/dev/null | while read file; do
-                echo "- \`$file\`"
-              done
-              echo ""
-              
-              # Show new/modified functions (for Python files)
-              echo "**Code Changes:**"
-              for pyfile in $(git diff --name-only HEAD~1 2>/dev/null | grep "\.py$"); do
-                if [ -f "$pyfile" ]; then
-                  echo "  📄 \`$pyfile\`:"
-                  # Extract function definitions added
-                  git diff HEAD~1 -- "$pyfile" 2>/dev/null | grep "^+" | grep -E "^\+def |^\+class |^\+async def " | sed 's/^+/    ➕ Added: /' || true
-                  # Extract function definitions removed
-                  git diff HEAD~1 -- "$pyfile" 2>/dev/null | grep "^-" | grep -E "^\-def |^\-class |^\-async def " | sed 's/^-/    ➖ Removed: /' || true
+              if [ -n "$CHANGED_FILES" ]; then
+                echo "### 📦 $proj" >> "../$REPORT_FILE"
+                echo "" >> "../$REPORT_FILE"
+                
+                # Show commit info
+                echo "**Last Commit:** $(git log -1 --pretty=format:'%h - %s (%an, %ar)' 2>/dev/null)" >> "../$REPORT_FILE"
+                echo "" >> "../$REPORT_FILE"
+                
+                # Show files changed in latest commit only
+                echo "**Files Modified:**" >> "../$REPORT_FILE"
+                echo "$CHANGED_FILES" | while read file; do
+                  echo "- \`$file\`" >> "../$REPORT_FILE"
+                done
+                echo "" >> "../$REPORT_FILE"
+                
+                # Show new/modified functions (for Python files) - latest commit only
+                echo "**Code Changes:**" >> "../$REPORT_FILE"
+                HAS_CODE_CHANGES=false
+                for pyfile in $(echo "$CHANGED_FILES" | grep "\.py$"); do
+                  if [ -f "$pyfile" ]; then
+                    echo "  📄 \`$pyfile\`:" >> "../$REPORT_FILE"
+                    # Extract function definitions added in latest commit
+                    ADDED=$(git diff HEAD~1 -- "$pyfile" 2>/dev/null | grep "^+" | grep -E "^\+def |^\+class |^\+async def " | sed 's/^+/    ➕ Added: /')
+                    REMOVED=$(git diff HEAD~1 -- "$pyfile" 2>/dev/null | grep "^-" | grep -E "^\-def |^\-class |^\-async def " | sed 's/^-/    ➖ Removed: /')
+                    
+                    if [ -n "$ADDED" ]; then
+                      echo "$ADDED" >> "../$REPORT_FILE"
+                      HAS_CODE_CHANGES=true
+                    fi
+                    if [ -n "$REMOVED" ]; then
+                      echo "$REMOVED" >> "../$REPORT_FILE"
+                      HAS_CODE_CHANGES=true
+                    fi
+                    if [ -z "$ADDED" ] && [ -z "$REMOVED" ]; then
+                      echo "    📝 Modified (no function signature changes)" >> "../$REPORT_FILE"
+                    fi
+                  fi
+                done
+                
+                if [ "$HAS_CODE_CHANGES" = false ]; then
+                  echo "  No Python function changes detected" >> "../$REPORT_FILE"
                 fi
-              done
-              echo ""
-              
-              # Show version changes
-              if [ -f "pyproject.toml" ]; then
-                VERSION=$(grep -E "^version\s*=" pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "N/A")
-                echo "**Version:** $VERSION"
+                echo "" >> "../$REPORT_FILE"
+                
+                # Show version
+                if [ -f "pyproject.toml" ]; then
+                  VERSION=$(grep -E "^version\s*=" pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "N/A")
+                  echo "**Version:** $VERSION" >> "../$REPORT_FILE"
+                fi
+                echo "" >> "../$REPORT_FILE"
+                echo "---" >> "../$REPORT_FILE"
               fi
-              echo ""
-              echo "---"
               
               cd ..
             fi
           done
           
-          echo ""
+          echo "" >> "$REPORT_FILE"
           
           # === SECTION 3: Cross-Repository Dependencies ===
-          echo "## 🔗 Cross-Repository Dependencies"
-          echo ""
-          echo "| Repository | Depends On | Depended By | Breaking Changes |"
-          echo "|-----------|------------|-------------|------------------|"
+          echo "## 🔗 Cross-Repository Dependencies" >> "$REPORT_FILE"
+          echo "" >> "$REPORT_FILE"
+          echo "| Repository | Depends On | Depended By | Breaking Changes |" >> "$REPORT_FILE"
+          echo "|-----------|------------|-------------|------------------|" >> "$REPORT_FILE"
           
           for proj in $(jq -r '.projects[].name' projects.json); do
             DEPS=$(jq -r --arg p "$proj" '.projects[] | select(.name==$p) | .dependencies | join(", ")' projects.json)
@@ -147,20 +185,21 @@ jobs:
             DEPENDED_BY=$(jq -r --arg p "$proj" '.projects[] | select(.dependencies | index($p)) | .name' projects.json | tr '\n' ', ' | sed 's/,$//')
             [ -z "$DEPENDED_BY" ] && DEPENDED_BY="None"
             
-            echo "| $proj | $DEPS | $DEPENDED_BY | No |"
+            echo "| $proj | $DEPS | $DEPENDED_BY | No |" >> "$REPORT_FILE"
           done
           
-          echo ""
+          echo "" >> "$REPORT_FILE"
           
           # === SECTION 4: Required Updates in Dependent Projects ===
-          echo "## 🔄 Required Updates in Dependent Projects"
-          echo ""
+          echo "## 🔄 Required Updates in Dependent Projects" >> "$REPORT_FILE"
+          echo "" >> "$REPORT_FILE"
           
+          FOUND_CHANGES=false
           for proj in $(jq -r '.projects[].name' projects.json); do
             if [ -d "$proj" ]; then
               cd "$proj"
               
-              # Check if there are actual changes
+              # Check if there are actual changes in latest commit
               CHANGES=$(git diff --name-only HEAD~1 2>/dev/null | wc -l)
               
               if [ "$CHANGES" -gt 0 ]; then
@@ -168,10 +207,11 @@ jobs:
                 DEPENDED_BY=$(jq -r --arg p "$proj" '.projects[] | select(.dependencies | index($p)) | .name' ../projects.json 2>/dev/null)
                 
                 if [ -n "$DEPENDED_BY" ]; then
-                  echo "### 📦 Changes in \`$proj\` affect:"
-                  echo ""
+                  FOUND_CHANGES=true
+                  echo "### 📦 Changes in \`$proj\` affect:" >> "../$REPORT_FILE"
+                  echo "" >> "../$REPORT_FILE"
                   
-                  # Extract new functions/exports
+                  # Extract new functions/exports from latest commit only
                   NEW_EXPORTS=""
                   for pyfile in $(git diff --name-only HEAD~1 2>/dev/null | grep "\.py$"); do
                     if [ -f "$pyfile" ]; then
@@ -184,27 +224,27 @@ jobs:
                   NEW_EXPORTS=$(echo "$NEW_EXPORTS" | sed 's/, $//')
                   
                   for dep in $DEPENDED_BY; do
-                    echo "#### 🎯 \`$dep\`"
-                    echo ""
-                    echo "**Impact:** This project imports from \`$proj\`"
-                    echo ""
+                    echo "#### 🎯 \`$dep\`" >> "../$REPORT_FILE"
+                    echo "" >> "../$REPORT_FILE"
+                    echo "**Impact:** This project imports from \`$proj\`" >> "../$REPORT_FILE"
+                    echo "" >> "../$REPORT_FILE"
                     
                     if [ -n "$NEW_EXPORTS" ]; then
-                      echo "**New functions available to use:**"
-                      echo "\`\`\`python"
-                      echo "from $proj import $NEW_EXPORTS"
-                      echo "\`\`\`"
-                      echo ""
-                      echo "**Recommended Actions:**"
-                      echo "- ✅ Consider using new functions: \`$NEW_EXPORTS\`"
-                      echo "- ✅ Update version requirement if needed"
-                      echo "- ⚠️ Run tests to ensure compatibility"
+                      echo "**New functions available to use:**" >> "../$REPORT_FILE"
+                      echo "\`\`\`python" >> "../$REPORT_FILE"
+                      echo "from $proj import $NEW_EXPORTS" >> "../$REPORT_FILE"
+                      echo "\`\`\`" >> "../$REPORT_FILE"
+                      echo "" >> "../$REPORT_FILE"
+                      echo "**Recommended Actions:**" >> "../$REPORT_FILE"
+                      echo "- ✅ Consider using new functions: \`$NEW_EXPORTS\`" >> "../$REPORT_FILE"
+                      echo "- ✅ Update version requirement if needed" >> "../$REPORT_FILE"
+                      echo "- ⚠️ Run tests to ensure compatibility" >> "../$REPORT_FILE"
                     else
-                      echo "**Recommended Actions:**"
-                      echo "- ✅ No code changes required (backward compatible)"
-                      echo "- ⚠️ Run tests to verify compatibility"
+                      echo "**Recommended Actions:**" >> "../$REPORT_FILE"
+                      echo "- ✅ No code changes required (backward compatible)" >> "../$REPORT_FILE"
+                      echo "- ⚠️ Run tests to verify compatibility" >> "../$REPORT_FILE"
                     fi
-                    echo ""
+                    echo "" >> "../$REPORT_FILE"
                   done
                 fi
               fi
@@ -213,14 +253,30 @@ jobs:
             fi
           done
           
-          echo ""
-          echo "### Dependency Notes"
+          if [ "$FOUND_CHANGES" = false ]; then
+            echo "No changes detected that affect dependent projects." >> "$REPORT_FILE"
+            echo "" >> "$REPORT_FILE"
+          fi
+          
+          echo "" >> "$REPORT_FILE"
+          echo "### Dependency Notes" >> "$REPORT_FILE"
           for proj in $(jq -r '.projects[].name' projects.json); do
             DEPENDED_BY=$(jq -r --arg p "$proj" '.projects[] | select(.dependencies | index($p)) | .name' projects.json | tr '\n' ', ' | sed 's/,$//')
             if [ -n "$DEPENDED_BY" ]; then
-              echo "- ⚠️ Changes to **$proj** will impact: $DEPENDED_BY"
+              echo "- ⚠️ Changes to **$proj** will impact: $DEPENDED_BY" >> "$REPORT_FILE"
             fi
           done
+          
+          echo "" >> "$REPORT_FILE"
+          echo "═══════════════════════════════════════════════════════════════" >> "$REPORT_FILE"
+          echo "✅ Report generated at: $(date)" >> "$REPORT_FILE"
+          echo "═══════════════════════════════════════════════════════════════" >> "$REPORT_FILE"
+          
+          # Display the report to console as well
+          echo ""
+          cat "$REPORT_FILE"
+          echo ""
+          echo "📄 Report saved to: $REPORT_FILE"
           
           echo ""
           echo "═══════════════════════════════════════════════════════════════"
