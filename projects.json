@@ -40,6 +40,14 @@
       "dependencies": ["project1", "project2", "project3", "project4"],
       "test_command": "python -c \"from project5 import ultra_greet; print(ultra_greet('CI'))\"",
       "export_function": "ultra_greet"
+    },
+    {
+      "name": "project6",
+      "repo": "project6",
+      "path": "./project6",
+      "dependencies": ["project1", "project2", "project3", "project5"],
+      "test_command": "python -c \"from project6 import supreme_greet; print(supreme_greet('CI'))\"",
+      "export_function": "supreme_greet"
     }
   ]
 }
