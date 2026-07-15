@@ -1,5 +1,9 @@
 {
   "github_owner": "Deepankar-MS",
+  "azure_devops": {
+    "organization": "Deepankar-MS",
+    "project": "multi-repo-analyser"
+  },
   "projects": [
     {
       "name": "project1",

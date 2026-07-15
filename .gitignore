@@ -1,1 +1,4 @@
 node_modules/
+*.db
+projects.db
+changes_output.txt
